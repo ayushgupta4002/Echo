@@ -1,0 +1,58 @@
+# Ignore the target directory where compiled files are stored
+/target/
+
+
+
+# Ignore build artifacts from Cargo
+**/*.rs.bk
+
+# Ignore the Cargo debug and release builds
+/target/debug/
+/target/release/
+
+# Ignore backup files and temporary files
+*.swp
+*.swo
+*.bak
+*.tmp
+
+# Ignore Rust test output
+/tests/tmp/
+
+# Ignore compiled libraries
+*.rlib
+
+# Ignore Rust's incremental compilation files
+/target/.rustc_info.json
+/target/.rustdoc_info.json
+
+# Ignore generated documentation
+/target/doc/
+
+# Ignore Rust's Clippy and Rustfmt artifacts
+/clippy.toml
+/rustfmt.toml
+
+# Ignore MacOS and Linux system files
+.DS_Store
+*.dSYM
+*.log
+
+# Ignore IDE-specific files
+.idea/
+.vscode/
+*.iml
+
+# Ignore editor swap files
+*.swp
+*.swo
+
+# Ignore coverage reports
+/coverage/
+
+# Ignore debugging symbols (if generated separately)
+/debug/
+
+# Ignore Rustup overrides
+rust-toolchain
+rust-toolchain.toml
