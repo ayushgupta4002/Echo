@@ -35,7 +35,7 @@ pub struct Position{
          queue!(stdout(), Clear(ClearType::All))?;
          Ok(())
      }
-     pub fn print<T: Display>(string: T)  -> Result<(), Error> {
+     pub fn print (string: &str)  -> Result<(), Error> {
         queue!(stdout(), Print(string))?;
         Ok(())
     }
