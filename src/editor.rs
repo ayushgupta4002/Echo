@@ -1,7 +1,7 @@
 
 
 use crossterm::event::{read, Event::{self, Key}, KeyCode::{self}, KeyEvent, KeyEventKind, KeyModifiers};
-use std::{cell::RefMut, cmp::min};
+use std::{cell::RefMut, cmp::min, panic::{set_hook, take_hook}};
 use std::{env, io::Error};
 mod terminal;
 use terminal::{Terminal, Position , Size };
@@ -24,38 +24,61 @@ pub struct Editor {
 
 impl Editor{
     
-    pub fn run(&mut self){
-        Terminal::initialize().unwrap();
-        self.handle_args(); 
-        let result = self.repl();
-        Terminal::terminate().unwrap();
-        result.unwrap();
-    }
-    fn handle_args(&mut self) {
+    // pub fn run(&mut self){
+    //     Terminal::initialize().unwrap();
+    //     self.handle_args(); 
+    //     let result = self.repl();
+    //     Terminal::terminate().unwrap();
+    //     result.unwrap();
+    // }
+    pub fn new()-> Result<Self, Error>{
+        let current_hook = take_hook();
+
+        set_hook(Box::new(move |panic_info| {
+            let _ = Terminal::terminate();
+            current_hook(panic_info);
+        }));
+        Terminal::initialize()?;
+        let mut view = View::default();
         let args: Vec<String> = env::args().collect();
         if let Some(file_name) = args.get(1) {
-           _=  self.view.load(file_name);
+            let _ = view.load(file_name);
         }
-    } 
+        Ok(Self {
+            should_quit: false,
+            location: Location::default(),
+            view,
+        })
+    }
+    // fn handle_args(&mut self) {
+    //     let args: Vec<String> = env::args().collect();
+    //     if let Some(file_name) = args.get(1) {
+    //        _=  self.view.load(file_name);
+    //     }
+    // } 
+    pub fn run(&mut self) {
 
-    fn repl(&mut self) -> Result<(), Error>{
-        loop { 
-            
-        
-            self.refresh_screen()?;
+        loop {
+            self.refresh_screen();
             if self.should_quit {
                 break;
             }
-            let event = read()?;
-            _ = self.evaluate_event(&event)?;
- 
+            match read() {
+                Ok(event) => self.evaluate_event(event),
+                Err(err) => {
+                    #[cfg(debug_assertions)]
+                    {
+                        panic!("Could not read event: {err:?}");
+                    }
+                }
+            }
         }
-        Ok(())
+
     }
 
-    fn move_point(&mut self, key_code:KeyCode) -> Result<(), Error> {
+    fn move_point(&mut self, key_code:KeyCode)  {
         let Location { mut x, mut y } = self.location;
-        let Size { height, width } = Terminal::size()?;
+        let Size { height, width } = Terminal::size().unwrap_or_default();
         match key_code {
             KeyCode::Up => {
                 y = y.saturating_sub(1);
@@ -84,34 +107,15 @@ impl Editor{
             _ => (),
         }
         self.location = Location { x, y };
-        Ok(())
+       return;
     }
 
-    fn evaluate_event(&mut self , event : &Event)-> Result<(), Error>{
-        // if let Key(KeyEvent{kind:KeyEventKind::Press, modifiers, code, state:_}) = event {
-        //   match code {
-        //       KeyCode::Char('q') if *modifiers == KeyModifiers::CONTROL => {
-        //         self.should_quit = true;
-                
-        //       }
-        //       KeyCode::Up
-        //       | KeyCode::Down
-        //       | KeyCode::Left
-        //       | KeyCode::Right
-        //       | KeyCode::PageDown
-        //       | KeyCode::PageUp
-        //       | KeyCode::End
-        //       | KeyCode::Home => {
-        //           self.move_point(*code)?;
-        //       }
-        //       _ => (),
-              
-        //   }
-        // }
+    fn evaluate_event(&mut self , event : Event){
+    
         match event {
             Key(KeyEvent{kind:KeyEventKind::Press, modifiers, code, state:_}) => {
                 match code {
-                    KeyCode::Char('q') if *modifiers == KeyModifiers::CONTROL => {
+                    KeyCode::Char('q') if modifiers == KeyModifiers::CONTROL => {
                         self.should_quit = true;
                     }
                     KeyCode::Up
@@ -122,38 +126,43 @@ impl Editor{
                     | KeyCode::PageUp
                     | KeyCode::End
                     | KeyCode::Home => {
-                        self.move_point(*code)?;
+                        self.move_point(code);
                     }
                     _ => (),
                 }
             }
             Event::Resize(width_u16,height_u16) => {
-            let height_usize = *height_u16 as usize;
-            let width_usize = *width_u16 as usize;
+            let height_usize = height_u16 as usize;
+            let width_usize = width_u16 as usize;
             _ = self.view.resize(Size{width: width_usize, height: height_usize});
             }
             
             _ => (),
             
         }
-        Ok(())
+        return;
         
     }
 
-    fn refresh_screen(&mut self) -> Result<(), Error> {
-        Terminal::hide_cursor()?;
-        Terminal::move_cursor_to(Position::default())?;
-        if self.should_quit {
-            _ = Terminal::clear_screen();
-            let _ = Terminal::print("Goodbye.\r\n");
-        }else{
-            self.view.render()?;
-            _ = Terminal::move_cursor_to(Position{x : self.location.x , y: self.location.y})?;
-        }
-        Terminal::show_cursor()?;
-        Terminal::execute()?;
-        Ok(())
+    fn refresh_screen(&mut self) {
+        Terminal::hide_cursor().unwrap();
+        let _ = Terminal::move_cursor_to(Position::default());
+      
+        self.view.render();
+        _ = Terminal::move_cursor_to(Position{x : self.location.x , y: self.location.y});
         
+        let _ =Terminal::show_cursor();
+        let _ = Terminal::execute();
+        return;        
     }
     
+}
+
+impl Drop for Editor {
+    fn drop(&mut self) {
+        let _ = Terminal::terminate();
+        if self.should_quit {
+            let _ = Terminal::print("Goodbye.\r\n"); 
+        }
+    }
 }

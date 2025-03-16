@@ -17,27 +17,23 @@ pub struct View{
 impl View{
     
 
-    pub fn render_line(line: &str , row : usize) -> Result<(), Error> {
-
-        Terminal::move_cursor_to(Position { x: 0, y: row })?;
-
-        Terminal::clear_line()?;
-        Terminal::print(line)?;
-        Ok(())
+    pub fn render_line(line: &str , row : usize)  {
+        let result = Terminal::print_row(line, row);
+         debug_assert!(result.is_ok(),"Error rendering line: {:?}", result);
     }
 
     
 
     
 
-    pub fn render(&mut self) -> Result<(), Error> {
+    pub fn render(&mut self) {
         if !self.needs_redraw {
-            return Ok(());
+            return ;
         }
         
         let Size { height, width } = self.size;
         if height == 0 || width == 0 {
-            return Ok(());
+            return ;
         }
         
         for this_row in 0..height {
@@ -47,26 +43,26 @@ impl View{
                 } else {
                     line
                 };
-                Self::render_line(truncated_line, this_row)?; // Use render_line instead of direct prints
+                Self::render_line(truncated_line, this_row); 
             } else if this_row == height / 2 && self.buffer.lines.is_empty() {
                 let mut welcome_message: String = format!("{NAME} editor -- version {VERSION}");
                 let len: usize = welcome_message.len();
                 if width <= len {
-                    Self::render_line("~", this_row)?;
+                    Self::render_line("~", this_row);
                 } else {
                     let padding = (width - len) / 2;
                     let spaces = " ".repeat(padding - 1);
                     welcome_message = format!("~{spaces}{welcome_message}");
                     welcome_message.truncate(width);
-                    Self::render_line(&welcome_message, this_row)?; // Use render_line here too
+                    Self::render_line(&welcome_message, this_row); // Use render_line here too
                 }
             } else {
-                Self::render_line("~", this_row)?;
+                Self::render_line("~", this_row);
             }
         }
         
         self.needs_redraw = false;
-        Ok(())
+        return;
     }
 
 
