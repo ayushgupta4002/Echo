@@ -1,7 +1,7 @@
 
 
 use crossterm::event::{read, Event::{self, Key}, KeyCode::{self}, KeyEvent, KeyEventKind, KeyModifiers};
-use std::cmp::min;
+use std::{cell::RefMut, cmp::min};
 use std::{env, io::Error};
 mod terminal;
 use terminal::{Terminal, Position , Size };
@@ -88,31 +88,59 @@ impl Editor{
     }
 
     fn evaluate_event(&mut self , event : &Event)-> Result<(), Error>{
-        if let Key(KeyEvent{kind:KeyEventKind::Press, modifiers, code, state:_}) = event {
-          match code {
-              KeyCode::Char('q') if *modifiers == KeyModifiers::CONTROL => {
-                self.should_quit = true;
+        // if let Key(KeyEvent{kind:KeyEventKind::Press, modifiers, code, state:_}) = event {
+        //   match code {
+        //       KeyCode::Char('q') if *modifiers == KeyModifiers::CONTROL => {
+        //         self.should_quit = true;
                 
-              }
-              KeyCode::Up
-              | KeyCode::Down
-              | KeyCode::Left
-              | KeyCode::Right
-              | KeyCode::PageDown
-              | KeyCode::PageUp
-              | KeyCode::End
-              | KeyCode::Home => {
-                  self.move_point(*code)?;
-              }
-              _ => (),
+        //       }
+        //       KeyCode::Up
+        //       | KeyCode::Down
+        //       | KeyCode::Left
+        //       | KeyCode::Right
+        //       | KeyCode::PageDown
+        //       | KeyCode::PageUp
+        //       | KeyCode::End
+        //       | KeyCode::Home => {
+        //           self.move_point(*code)?;
+        //       }
+        //       _ => (),
               
-          }
+        //   }
+        // }
+        match event {
+            Key(KeyEvent{kind:KeyEventKind::Press, modifiers, code, state:_}) => {
+                match code {
+                    KeyCode::Char('q') if *modifiers == KeyModifiers::CONTROL => {
+                        self.should_quit = true;
+                    }
+                    KeyCode::Up
+                    | KeyCode::Down
+                    | KeyCode::Left
+                    | KeyCode::Right
+                    | KeyCode::PageDown
+                    | KeyCode::PageUp
+                    | KeyCode::End
+                    | KeyCode::Home => {
+                        self.move_point(*code)?;
+                    }
+                    _ => (),
+                }
+            }
+            Event::Resize(width_u16,height_u16) => {
+            let height_usize = *height_u16 as usize;
+            let width_usize = *width_u16 as usize;
+            _ = self.view.resize(Size{width: width_usize, height: height_usize});
+            }
+            
+            _ => (),
+            
         }
         Ok(())
         
     }
 
-    fn refresh_screen(&self) -> Result<(), Error> {
+    fn refresh_screen(&mut self) -> Result<(), Error> {
         Terminal::hide_cursor()?;
         Terminal::move_cursor_to(Position::default())?;
         if self.should_quit {

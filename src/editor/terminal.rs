@@ -5,7 +5,7 @@ use crossterm::terminal::{disable_raw_mode, enable_raw_mode, size, Clear, ClearT
 use std::fmt::Display;
 use std::io::{stdout, Error, Write}; 
 
-#[derive(Debug , Clone, Copy)]
+#[derive(Debug , Default, Clone, Copy)]
 pub struct Size{
     pub width: usize,
     pub height: usize
