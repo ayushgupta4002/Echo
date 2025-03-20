@@ -17,6 +17,15 @@ pub struct Position{
     pub x: usize,
     pub y: usize
 }
+
+impl Position {
+    pub const fn saturating_sub(self, other: Self) -> Self { 
+        Self {
+            x: self.x.saturating_sub(other.x),
+            y: self.y.saturating_sub(other.y),
+        }
+    }
+}
  pub struct Terminal {}
  
  impl Terminal {

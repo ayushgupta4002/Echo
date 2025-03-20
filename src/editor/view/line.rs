@@ -1,25 +1,105 @@
-use std::{cmp, ops::Range};
-
+use std::{cmp, ops::Range, option};
+use unicode_width::UnicodeWidthStr;
 use unicode_segmentation::UnicodeSegmentation;
-
-pub struct Line {
-    string: String,
+#[derive(Copy, Clone)]
+enum GraphemeWidth {
+    Half,
+    Full,
 }
 
-impl Line {
-    pub fn from(line_str: &str) -> Self { 
-        Self {
-            string: String::from(line_str),
+impl GraphemeWidth {
+    const fn saturating_add(self, other: usize) -> usize {
+        match self {
+            Self::Half => other.saturating_add(1),
+            Self::Full => other.saturating_add(2), 
         }
     }
-    pub fn get(&self, range: Range<usize>) -> String { 
-        let start = range.start;
-        let end = cmp::min(range.end, self.string.len());
-        self.string.graphemes(true).skip(start).take(end.saturating_sub(start)).collect()
+}
+
+struct TextFragment {
+    grapheme: String,
+    rendered_width: GraphemeWidth,
+    replacement: Option<char>,
+}
+pub struct Line {
+    fragments: Vec<TextFragment>,
+}
+impl Line {
+    pub fn from(line_str: &str) -> Self { 
+        let fragments = line_str
+            .graphemes(true) 
+            .map(|grapheme| {
+                let (replacement, rendered_width) = Self::replace_char(grapheme).map_or_else(
+                    || {
+                        let unicode_width = grapheme.width();
+                        let rendered_width = match unicode_width {
+                            0 | 1 => GraphemeWidth::Half,
+                            _ => GraphemeWidth::Full,
+                        };
+                        (None, rendered_width)
+                    },
+                    |replacement| (Some(replacement), GraphemeWidth::Half),
+                );
+
+                TextFragment {
+                    grapheme: grapheme.to_string(),
+                    rendered_width,
+                    replacement,
+                } 
+            })
+            .collect(); 
+        Self { fragments }
     }
 
-    pub fn len(&self) -> usize { 
-        self.string[..].graphemes(true).count()
+
+    fn replace_char(str: &str) -> Option<char> {
+        let width = str.width();
+        match str {
+            " " => None,
+            "\t" => Some(' '),
+            _ if width > 0 && str.trim().is_empty() => Some('␣'),
+            _ => None,
+        }
     }
 
+    pub fn get_visible_graphemes(&self, range: Range<usize>) -> String {
+        if range.start >= range.end {
+            return String::new();
+        } 
+        let mut result = String::new();
+        let mut current_pos = 0; 
+        for fragment in &self.fragments {
+            let fragment_end = fragment.rendered_width.saturating_add(current_pos); 
+            if current_pos >= range.end {
+                break;
+            } 
+            if fragment_end > range.start { 
+                if fragment_end > range.end || current_pos < range.start {
+                    // Clip on the right or left
+                    result.push('⋯'); 
+                } else if let Some(char) = fragment.replacement {
+                    result.push(char); 
+                } else {
+                    result.push_str(&fragment.grapheme); 
+                }
+            }
+            current_pos = fragment_end;
+        }
+        result
+    }
+    
+    pub fn grapheme_count(&self) -> usize { 
+        self.fragments.len()
+    }
+
+    pub fn width_until(&self, grapheme_index: usize) -> usize { 
+        self.fragments
+            .iter()
+            .take(grapheme_index) 
+            .map(|fragment| match fragment.rendered_width {
+                GraphemeWidth::Half => 1,
+                GraphemeWidth::Full => 2, 
+            })
+            .sum() 
+    }
 }

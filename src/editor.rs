@@ -102,7 +102,7 @@ impl Editor{
         let _ = Terminal::move_cursor_to(Position::default());
       
         self.view.render();
-        _ = Terminal::move_cursor_to(self.view.get_position());
+        _ = Terminal::move_cursor_to(self.view.caret_position());
         
         let _ =Terminal::show_cursor();
         let _ = Terminal::execute();
@@ -119,3 +119,5 @@ impl Drop for Editor {
         }
     }
 }
+
+

@@ -9,15 +9,20 @@ use super::terminal::{ Position, Size, Terminal} ;
 use std::{cmp::min, io::Error};
 mod line;
 mod location;
-use location::Location;
 const NAME: &str = "Echo";
 const VERSION: &str = "0.1.0";
+
+#[derive(Copy, Clone, Default)]
+pub struct Location {
+    pub grapheme_index: usize,
+    pub line_index: usize,
+}
 pub struct View{
     buffer: Buffer,
     size: Size,
     needs_redraw: bool,
-    location: Location,
-    scroll_offset: Location,
+    text_location: Location,
+    scroll_offset: Position,
 }
 impl View{
 
@@ -25,9 +30,19 @@ impl View{
         let result = Terminal::print_row(line, row);
          debug_assert!(result.is_ok(),"Error rendering line: {:?}", result);
     }
-    pub fn get_position(&self) -> Position { 
-        self.location.subtract(&self.scroll_offset).into()
+    pub fn caret_position(&self) -> Position { 
+        self.text_location_to_position()
+            .saturating_sub(self.scroll_offset)
     }
+
+    fn text_location_to_position(&self) -> Position {
+        let y = self.text_location.line_index;
+        let x = self.buffer.lines.get(y).map_or(0, |line| {
+            line.width_until(self.text_location.grapheme_index)
+        });
+        Position { x ,y } 
+    }
+
     pub fn render(&mut self) {
         if !self.needs_redraw {
             return ;
@@ -45,7 +60,7 @@ impl View{
                 let right: usize= self.scroll_offset.x.saturating_add(width);
 
 
-                Self::render_line(&line.get(left..right), this_row); 
+                Self::render_line(&line.get_visible_graphemes(left..right), this_row); 
             } else if this_row == height / 2 && self.buffer.lines.is_empty() {
                 let mut welcome_message: String = format!("{NAME} editor -- version {VERSION}");
                 let len: usize = welcome_message.len();
@@ -67,79 +82,64 @@ impl View{
         return;
     }
     pub fn move_point(&mut self, key_code:KeyCode)  {
-        let Location { mut x, mut y } = self.location;
+        let Location { mut grapheme_index, mut line_index } = self.text_location;
         let Size { height, width } = Terminal::size().unwrap_or_default();
         match key_code {
             KeyCode::Up => {
-                y = y.saturating_sub(1);
+                line_index = line_index.saturating_sub(1);
             }
             KeyCode::Down => {
-                y = y.saturating_add(1);
+                line_index = line_index.saturating_add(1);
             }
             KeyCode::Left => {
-                if x>0 {
-                    x -=1;
+                if grapheme_index>0 {
+                    grapheme_index -=1;
                 }
-                else if  y>0 {
-                    y -=1;
-                    x = self.buffer.lines.get(y).map_or(0, Line::len); 
+                else if  line_index>0 {
+                    line_index -=1;
+                    grapheme_index = self.buffer.lines.get(line_index).map_or(0, Line::grapheme_count); 
  
                 }
             }
             KeyCode::Right => {
-                let line_len = self.buffer.lines.get(y).map_or(0, Line::len); 
-                if x < line_len{
-                    x +=1;
+                let line_len = self.buffer.lines.get(line_index).map_or(0, Line::grapheme_count); 
+                if grapheme_index < line_len{
+                    grapheme_index +=1;
 
                 }
                 else{
-                    y = y.saturating_add(1);
-                    x = 0;
+                    line_index = line_index.saturating_add(1);
+                    grapheme_index = 0;
 
                 }
 
-                x =  x.saturating_add(1);
+                // grapheme_index =  grapheme_index.saturating_add(1);
             }
             KeyCode::PageUp => {
-                y = 0;
+                line_index = 0;
             }
             KeyCode::PageDown => {
-                y = height.saturating_sub(1);
+                line_index = height.saturating_sub(1);
             }
             KeyCode::Home => {
-                x = 0;
+                grapheme_index = 0;
             }
             KeyCode::End => {
-                x = self.buffer.lines.get(y).map_or(0, Line::len);
+                grapheme_index = self.buffer.lines.get(line_index).map_or(0, Line::grapheme_count);
             }
             _ => (),
         }
 
-        x = min(x, self.buffer.lines.get(y).map_or(0, Line::len));
-        y = min(y, self.buffer.lines.len());
-        self.location = Location { x, y };
+        grapheme_index = min(grapheme_index, self.buffer.lines.get(line_index).map_or(0, Line::grapheme_count));
+        line_index = min(line_index, self.buffer.lines.len());
+        self.text_location = Location { grapheme_index, line_index };
         
         
         self.scroll_location_into_view();
        return;
     }
 
-    // fn draw_welcome_message() -> Result<(), Error> {
-    //     let mut welcome_message: String = format!("{NAME} editor -- version {VERSION}");
-    //     let width = Terminal::size()?.width as usize;
-    //     let len = welcome_message.len();
-    //     let padding = (width - len) / 2; 
-    //     let spaces = " ".repeat(padding - 1);
-    //     welcome_message = format!("~{spaces}{welcome_message}");
-    //     welcome_message.truncate(width); 
-    //     Terminal::print(&welcome_message)?;
-    //     Ok(())
-    // }
-    // fn draw_empty_row() -> Result<(), Error> {
-    //     Terminal::print("~")?;
-    //     Ok(())
-    // }
-
+ 
     pub fn resize(&mut self , size : Size) -> Result<(), Error> {
         self.size = size;
         self.scroll_location_into_view();
@@ -156,26 +156,26 @@ impl View{
         Ok(())
     }
     pub fn scroll_location_into_view(&mut self) {
-        let Location { x, y } = self.location;
+        let Location { grapheme_index, line_index } = self.text_location;
         let Size { width, height } = self.size;
         let mut offset_changed = false;
 
 
         // Scroll vertically
-        if y < self.scroll_offset.y {
-            self.scroll_offset.y = y;
+        if line_index < self.scroll_offset.y {
+            self.scroll_offset.y = line_index;
             offset_changed = true;
-        } else if y >= self.scroll_offset.y.saturating_add(height) {
-            self.scroll_offset.y = y.saturating_sub(height).saturating_add(1);
+        } else if line_index >= self.scroll_offset.y.saturating_add(height) {
+            self.scroll_offset.y = line_index.saturating_sub(height).saturating_add(1);
             offset_changed = true;
         }
 
         //Scroll horizontally
-        if x < self.scroll_offset.x {
-            self.scroll_offset.x = x;
+        if grapheme_index < self.scroll_offset.x {
+            self.scroll_offset.x = grapheme_index;
             offset_changed = true;
-        } else if x >= self.scroll_offset.x.saturating_add(width) {
-            self.scroll_offset.x = x.saturating_sub(width).saturating_add(1);
+        } else if grapheme_index >= self.scroll_offset.x.saturating_add(width) {
+            self.scroll_offset.x = grapheme_index.saturating_sub(width).saturating_add(1);
             offset_changed = true;
         }
         self.needs_redraw = offset_changed;
@@ -189,8 +189,8 @@ impl Default for View {
             buffer: Buffer::default(),
             needs_redraw: true,
             size: Terminal::size().unwrap_or_default(), 
-            location: Location::default(),
-            scroll_offset: Location::default(),
+            text_location: Location::default(),
+            scroll_offset: Position::default(),
         }
     }
 }
