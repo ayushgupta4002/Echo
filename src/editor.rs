@@ -11,7 +11,7 @@ use view::View;
 #[derive(Default)]
 pub struct Editor {
     should_quit: bool,
-    view :View
+    view :View,
 }
 
 
@@ -77,8 +77,10 @@ impl Editor{
                     | KeyCode::PageDown
                     | KeyCode::PageUp
                     | KeyCode::End
-                    | KeyCode::Home => {
+                    | KeyCode::Home
+                    | KeyCode::Char(_) => {
                         self.view.move_point(code);
+
                     }
                     _ => (),
                 }
@@ -98,11 +100,12 @@ impl Editor{
     }
 
     fn refresh_screen(&mut self) {
+
         Terminal::hide_cursor().unwrap();
         let _ = Terminal::move_cursor_to(Position::default());
       
         self.view.render();
-        _ = Terminal::move_cursor_to(self.view.caret_position());
+        let _ = Terminal::move_cursor_to(self.view.caret_position());
         
         let _ =Terminal::show_cursor();
         let _ = Terminal::execute();

@@ -62,9 +62,11 @@ impl Position {
 
         Ok(())
     }
-     pub fn move_cursor_to(position : Position) -> Result<(), std::io::Error> {
+     pub fn move_cursor_to(position : Position) -> Result<Position, std::io::Error> {
          queue!(stdout(), MoveTo(position.x as u16, position.y as u16))?;
-         Ok(())
+
+         
+         Ok(Position { x: position.x, y: position.y })
      }
      pub fn size() -> Result<Size, Error> { 
         let (width, height) = size()?;
@@ -89,7 +91,6 @@ impl Position {
 
     pub fn print_row(line: &str , row : usize) -> Result<(), Error> {
         Self::move_cursor_to(Position { x: 0, y: row })?;
-
         Self::clear_line()?;
         Self::print(line)?;
         Ok(())

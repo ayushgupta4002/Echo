@@ -12,11 +12,13 @@ mod location;
 const NAME: &str = "Echo";
 const VERSION: &str = "0.1.0";
 
-#[derive(Copy, Clone, Default)]
+#[derive(Copy, Clone, Default, Debug)]
 pub struct Location {
     pub grapheme_index: usize,
     pub line_index: usize,
 }
+
+#[derive(Debug)]
 pub struct View{
     buffer: Buffer,
     size: Size,
@@ -27,6 +29,7 @@ pub struct View{
 impl View{
 
     pub fn render_line(line: &str , row : usize)  {
+
         let result = Terminal::print_row(line, row);
          debug_assert!(result.is_ok(),"Error rendering line: {:?}", result);
     }
@@ -44,9 +47,12 @@ impl View{
     }
 
     pub fn render(&mut self) {
+        // println!("refresh_screen called, need_redraw: {}", self.needs_redraw);
+
         if !self.needs_redraw {
             return ;
         }
+
         
         let Size { height, width } = self.size;
         if height == 0 || width == 0 {
@@ -58,6 +64,7 @@ impl View{
 
                 let left = self.scroll_offset.x;
                 let right: usize= self.scroll_offset.x.saturating_add(width);
+                // println!("Visible Graphemes: {:?}", line.get_visible_graphemes(left..right));
 
 
                 Self::render_line(&line.get_visible_graphemes(left..right), this_row); 
@@ -87,9 +94,13 @@ impl View{
         match key_code {
             KeyCode::Up => {
                 line_index = line_index.saturating_sub(1);
+                self.set_data(grapheme_index, line_index);
+
             }
             KeyCode::Down => {
                 line_index = line_index.saturating_add(1);
+                self.set_data(grapheme_index, line_index);
+
             }
             KeyCode::Left => {
                 if grapheme_index>0 {
@@ -100,9 +111,12 @@ impl View{
                     grapheme_index = self.buffer.lines.get(line_index).map_or(0, Line::grapheme_count); 
  
                 }
+                self.set_data(grapheme_index, line_index);
+
             }
             KeyCode::Right => {
                 let line_len = self.buffer.lines.get(line_index).map_or(0, Line::grapheme_count); 
+                // print!("{:?}", self.buffer.lines.get(line_index));
                 if grapheme_index < line_len{
                     grapheme_index +=1;
 
@@ -112,34 +126,83 @@ impl View{
                     grapheme_index = 0;
 
                 }
+                self.set_data(grapheme_index, line_index);
 
                 // grapheme_index =  grapheme_index.saturating_add(1);
             }
             KeyCode::PageUp => {
                 line_index = 0;
+                self.set_data(grapheme_index, line_index);
+
             }
             KeyCode::PageDown => {
                 line_index = height.saturating_sub(1);
+                self.set_data(grapheme_index, line_index);
+
             }
             KeyCode::Home => {
                 grapheme_index = 0;
+                self.set_data(grapheme_index, line_index);
+
             }
             KeyCode::End => {
                 grapheme_index = self.buffer.lines.get(line_index).map_or(0, Line::grapheme_count);
+                self.set_data(grapheme_index, line_index);
+            }
+            KeyCode::Char(character ) => {
+                // print!("{:?}", character);
+                self.insert_char(character);
             }
             _ => (),
         }
+    self.scroll_location_into_view();
+   return;
+}
 
+    fn set_data(&mut self, mut grapheme_index: usize, mut line_index: usize) {
         grapheme_index = min(grapheme_index, self.buffer.lines.get(line_index).map_or(0, Line::grapheme_count));
         line_index = min(line_index, self.buffer.lines.len());
         self.text_location = Location { grapheme_index, line_index };
-        
-        
-        self.scroll_location_into_view();
-       return;
     }
 
- 
+    fn insert_char(&mut self, character: char) {
+        let Location { mut grapheme_index, mut line_index } = self.text_location;
+
+        let old_len = self
+            .buffer
+            .lines
+            .get(self.text_location.line_index)
+            .map_or(0, Line::grapheme_count); 
+
+
+        self.buffer.insert_char(character, self.text_location);
+
+        let new_len = self
+            .buffer
+            .lines
+            .get(self.text_location.line_index)
+            .map_or(0, Line::grapheme_count); 
+        let grapheme_delta = new_len.saturating_sub(old_len);
+        if grapheme_delta > 0 {
+            //move right for an added grapheme (should be the regular case)
+            let line_len = self.buffer.lines.get(line_index).map_or(0, Line::grapheme_count); 
+            if grapheme_index < line_len{
+                grapheme_index +=1;
+
+            }
+            else{
+                line_index = line_index.saturating_add(2);
+                grapheme_index = 0;
+
+            }
+        }
+        self.text_location = Location { grapheme_index, line_index };
+        
+        self.needs_redraw = true;
+
+        // self.render();
+    }
+
     pub fn resize(&mut self , size : Size) -> Result<(), Error> {
         self.size = size;
         self.scroll_location_into_view();
@@ -178,7 +241,8 @@ impl View{
             self.scroll_offset.x = grapheme_index.saturating_sub(width).saturating_add(1);
             offset_changed = true;
         }
-        self.needs_redraw = offset_changed;
+        self.needs_redraw = self.needs_redraw || offset_changed;
+
     }
 
 }
