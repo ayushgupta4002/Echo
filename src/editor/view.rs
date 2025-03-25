@@ -153,17 +153,80 @@ impl View{
                 // print!("{:?}", character);
                 self.insert_char(character);
             }
+            KeyCode::Tab => {
+                self.insert_char('\t');
+            }
+            KeyCode::Enter => {
+                self.enter_key();
+            }
+            KeyCode::Backspace => {
+                self.backspace();
+            }
+            KeyCode::Delete => {
+                self.delete();
+
+            }
+            
             _ => (),
         }
     self.scroll_location_into_view();
    return;
 }
 
+    pub fn save(&mut self) {
+        self.buffer.save().unwrap();
+    }
+
     fn set_data(&mut self, mut grapheme_index: usize, mut line_index: usize) {
         grapheme_index = min(grapheme_index, self.buffer.lines.get(line_index).map_or(0, Line::grapheme_count));
         line_index = min(line_index, self.buffer.lines.len());
         self.text_location = Location { grapheme_index, line_index };
     }
+
+    fn enter_key(&mut self){
+        self.buffer.insert_newline(self.text_location);
+        let Location { mut grapheme_index, mut line_index } = self.text_location;
+
+        let line_len = self.buffer.lines.get(line_index).map_or(0, Line::grapheme_count); 
+        // print!("{:?}", self.buffer.lines.get(line_index));
+        if grapheme_index < line_len{
+            grapheme_index +=1;
+
+        }
+        else{
+            line_index = line_index.saturating_add(1);
+            grapheme_index = 0;
+
+        }
+        self.text_location = Location { grapheme_index, line_index };
+        self.needs_redraw = true;
+
+    }
+    fn backspace(&mut self) {
+        let Location { mut grapheme_index, mut line_index } = self.text_location;
+        if grapheme_index>0 {
+            grapheme_index -=1;
+        }
+        else if  line_index>0 {
+            line_index -=1;
+            grapheme_index = self.buffer.lines.get(line_index).map_or(0, Line::grapheme_count); 
+
+        }
+        if self.text_location.line_index !=0 || self.text_location.grapheme_index !=0 {
+            self.text_location = Location { grapheme_index, line_index };
+
+            self.delete();
+        }
+    }
+
+    fn delete(&mut self){
+        self.buffer.delete(self.text_location);
+        self.scroll_location_into_view();
+
+        self.needs_redraw = true;
+
+    }
+    
 
     fn insert_char(&mut self, character: char) {
         let Location { mut grapheme_index, mut line_index } = self.text_location;

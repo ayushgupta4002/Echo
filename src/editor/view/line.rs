@@ -1,4 +1,5 @@
-use std::{cmp, ops::Range, option};
+use core::fmt;
+use std::{ default, ops::Range, option};
 use unicode_width::UnicodeWidthStr;
 use unicode_segmentation::UnicodeSegmentation;
 #[derive(Copy, Clone , Debug)]
@@ -21,7 +22,7 @@ struct TextFragment {
     rendered_width: GraphemeWidth,
     replacement: Option<char>,
 }
-#[derive( Debug)]
+#[derive( Debug , Default)]
 pub struct Line {
     fragments: Vec<TextFragment>,
 }
@@ -123,5 +124,44 @@ impl Line {
             result.push(character);
         } 
         self.fragments = Self::str_to_fragments(&result); 
+    }
+
+    pub fn delete(&mut self, grapheme_index: usize) {
+        if grapheme_index >= self.fragments.len() {
+            return;
+        }
+        let mut result = String::new();
+        for (index, fragment) in self.fragments.iter().enumerate() {
+            if index != grapheme_index {
+                result.push_str(&fragment.grapheme);
+            }
+        }
+        self.fragments = Self::str_to_fragments(&result);
+    }
+
+    pub fn append(&mut self, other: &Self) {
+        let mut concat = self.to_string();
+        concat.push_str(&other.to_string());
+        self.fragments = Self::str_to_fragments(&concat); 
+    }
+
+    pub fn split(&mut self, grapheme_index: usize) -> Self {
+        if grapheme_index == self.fragments.len() {
+            return Self::default();
+        }
+        let remainder = self.fragments.split_off(grapheme_index);
+        Self { fragments: remainder }
+    }
+}
+
+
+impl fmt::Display for Line {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        let result: String = self
+            .fragments
+            .iter()
+            .map(|fragment| fragment.grapheme.clone())
+            .collect();
+        write!(formatter, "{result}") 
     }
 }

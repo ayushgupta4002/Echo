@@ -70,6 +70,9 @@ impl Editor{
                     KeyCode::Char('q') if modifiers == KeyModifiers::CONTROL => {
                         self.should_quit = true;
                     }
+                    KeyCode::Char('s') => {
+                        self.view.save();
+                    }
                     KeyCode::Up
                     | KeyCode::Down
                     | KeyCode::Left
@@ -78,6 +81,11 @@ impl Editor{
                     | KeyCode::PageUp
                     | KeyCode::End
                     | KeyCode::Home
+                    | KeyCode::Backspace
+                    | KeyCode::Delete
+                    | KeyCode::Enter
+                    | KeyCode::Tab
+                
                     | KeyCode::Char(_) => {
                         self.view.move_point(code);
 
