@@ -12,6 +12,14 @@ Echo is a lightweight, terminal-based text editor written in Rust. It provides a
 - Support for UTF-8 text
 - Terminal resizing support
 
+## Images
+
+![image](https://github.com/user-attachments/assets/bacfd799-a846-4723-8d3f-2707f2dfd8e1)
+
+![image](https://github.com/user-attachments/assets/18646cd0-e77e-4cbc-b9d4-18e4a7fdf502)
+
+https://github.com/user-attachments/assets/56845cac-d66b-437a-9977-9cf172a14ebb
+
 ## Installation
 
 ### Prerequisites
