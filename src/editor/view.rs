@@ -5,7 +5,7 @@ mod buffer;
 use buffer::Buffer;
 use crossterm::event::KeyCode;
 use line::Line;
-use super::terminal::{ Position, Size, Terminal} ;
+use super::{terminal::{ Position, Size, Terminal}, DocumentStatus} ;
 use std::{cmp::min, io::Error};
 mod line;
 mod location;
@@ -18,7 +18,7 @@ pub struct Location {
     pub line_index: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug , Default)]
 pub struct View{
     buffer: Buffer,
     size: Size,
@@ -27,6 +27,27 @@ pub struct View{
     scroll_offset: Position,
 }
 impl View{
+
+    pub fn new(margin_bottom : usize) -> Self {
+        let size = Terminal::size().unwrap_or_default();
+        Self {
+            buffer: Buffer::default(),
+            needs_redraw: true,
+            size: Size { width: size.width, height: size.height.saturating_sub(margin_bottom) },
+            text_location: Location::default(),
+            scroll_offset: Position::default(),
+        }
+    }
+
+    pub fn get_status(&self) -> DocumentStatus{
+        DocumentStatus{
+            total_lines: self.buffer.lines.len(),
+            current_line_index: self.text_location.line_index,
+            file_name: self.buffer.file_name.clone(),
+            is_modified: self.buffer.dirty,
+        }
+
+    }
 
     pub fn render_line(line: &str , row : usize)  {
 
@@ -310,14 +331,14 @@ impl View{
 
 }
 
-impl Default for View {
-    fn default() -> Self {
-        Self {
-            buffer: Buffer::default(),
-            needs_redraw: true,
-            size: Terminal::size().unwrap_or_default(), 
-            text_location: Location::default(),
-            scroll_offset: Position::default(),
-        }
-    }
-}
+// impl Default for View {
+//     fn default() -> Self {
+//         Self {
+//             buffer: Buffer::default(),
+//             needs_redraw: true,
+//             size: Terminal::size().unwrap_or_default(), 
+//             text_location: Location::default(),
+//             scroll_offset: Position::default(),
+//         }
+//     }
+// }

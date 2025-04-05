@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{ default, ops::Range, option};
+use std::ops::Range;
 use unicode_width::UnicodeWidthStr;
 use unicode_segmentation::UnicodeSegmentation;
 #[derive(Copy, Clone , Debug)]

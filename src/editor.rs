@@ -1,19 +1,29 @@
 
 
 use crossterm::event::{read, Event::{self, Key}, KeyCode::{self}, KeyEvent, KeyEventKind, KeyModifiers};
+use statusbar::StatusBar;
 use std::panic::{set_hook, take_hook};
 use std::{env, io::Error};
 mod terminal;
 use terminal::{Terminal, Position , Size };
 mod view;
 use view::View;
-
+mod statusbar;
 #[derive(Default)]
 pub struct Editor {
     should_quit: bool,
     view :View,
+    statusbar: StatusBar,
 }
 
+
+#[derive(Default, Eq, PartialEq, Debug)]
+pub struct DocumentStatus{
+    pub total_lines: usize,
+    pub current_line_index: usize,
+    file_name: Option<String>,
+    is_modified: bool,
+}
 
 impl Editor{
     
@@ -26,7 +36,7 @@ impl Editor{
             current_hook(panic_info);
         }));
         Terminal::initialize()?;
-        let mut view = View::default();
+        let mut view = View::new(2);
         let args: Vec<String> = env::args().collect();
         if let Some(file_name) = args.get(1) {
             let _ = view.load(file_name);
@@ -34,6 +44,7 @@ impl Editor{
         Ok(Self {
             should_quit: false,
             view,
+            statusbar: StatusBar::new(1),
         })
     }
     // fn handle_args(&mut self) {
@@ -58,6 +69,8 @@ impl Editor{
                     }
                 }
             }
+            let status = self.view.get_status();
+            self.statusbar.update_status(status);
         }
 
     }
@@ -113,6 +126,8 @@ impl Editor{
         let _ = Terminal::move_cursor_to(Position::default());
       
         self.view.render();
+        self.statusbar.render();
+
         let _ = Terminal::move_cursor_to(self.view.caret_position());
         
         let _ =Terminal::show_cursor();
